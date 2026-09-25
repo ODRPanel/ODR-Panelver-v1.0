@@ -1,5 +1,7 @@
 import { PrismaClient, ProfileCode } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import { addMonths, addDays, subDays } from "date-fns";
 import { DEFAULT_ROLE_PERMISSIONS, SYSTEM_ROLES } from "../src/lib/permissions";
 
 const prisma = new PrismaClient();
@@ -195,6 +197,7 @@ const DEMO_USERS: Array<{ email: string; fullName: string; role: (typeof SYSTEM_
   { email: "appointing.authority@odrpanel.local", fullName: "Adrian Appointing", role: "Appointing Authority" },
   { email: "arbitrator@odrpanel.local", fullName: "Arvind Arbitrator", role: "Arbitrator" },
   { email: "presiding.arbitrator@odrpanel.local", fullName: "Priya Presiding", role: "Arbitrator" },
+  { email: "co.arbitrator@odrpanel.local", fullName: "Chandra Co-Arbitrator", role: "Arbitrator" },
   { email: "emergency.arbitrator@odrpanel.local", fullName: "Emma Emergency", role: "Emergency Arbitrator" },
   { email: "tribunal.secretary@odrpanel.local", fullName: "Tariq Secretary", role: "Tribunal Secretary" },
   { email: "case.manager@odrpanel.local", fullName: "Carla Manager", role: "Case Manager" },
@@ -277,6 +280,315 @@ async function seedTemplates(profileIds: Record<string, string>) {
   }
 }
 
+async function writeAuditRow(action: string, actorUserId: string, referenceId: string) {
+  const last = await prisma.auditLogEntry.findFirst({ orderBy: { createdAt: "desc" }, select: { immutableHash: true } });
+  const payload = JSON.stringify({ previousHash: last?.immutableHash ?? "GENESIS", action, actorUserId, referenceId, at: new Date().toISOString() });
+  const immutableHash = crypto.createHash("sha256").update(payload).digest("hex");
+  await prisma.auditLogEntry.create({ data: { action, actorUserId, referenceId, immutableHash } });
+}
+
+/**
+ * A single richly-populated demo Reference so a first-time, non-technical
+ * reviewer sees a working system immediately after installation, rather
+ * than an empty shell. Touches most of the 23 modules at Section 5 of the
+ * SOW/SRS. Safe to re-run - skipped if it already exists.
+ */
+async function seedDemoCase(users: Record<string, string>, profileIds: Record<string, string>) {
+  const existing = await prisma.case.findUnique({ where: { referenceNumber: "ODR-DEMO-0001" } });
+  if (existing) {
+    console.log("Demo case already exists, skipping.");
+    return;
+  }
+
+  const now = new Date();
+  const kase = await prisma.case.create({
+    data: {
+      institutionId: DEFAULT_INSTITUTION_ID,
+      referenceNumber: "ODR-DEMO-0001",
+      title: "Meridian Infrastructure Pvt. Ltd. v. Coastal Developers Ltd.",
+      jurisdictionProfileId: profileIds.INDIA,
+      type: "institutional",
+      seat: "New Delhi",
+      competentCourt: "High Court of Delhi",
+      ledgerCurrency: "INR",
+      status: "hearings",
+      timelineStartDate: now,
+      timelineDeadline: addMonths(now, 12),
+      confidentialityAccepted: true,
+      fidicEnabled: true,
+      aiEnabled: false,
+      createdByUserId: users["registrar@odrpanel.local"],
+    },
+  });
+  await writeAuditRow("case.created", users["registrar@odrpanel.local"], kase.id);
+
+  // Tribunal - three-member, fully constituted and confirmed.
+  const tribunal = await prisma.tribunal.create({
+    data: { referenceId: kase.id, compositionType: "three_member", status: "constituted" },
+  });
+  await prisma.tribunalMember.createMany({
+    data: [
+      {
+        tribunalId: tribunal.id,
+        arbitratorUserId: users["arbitrator@odrpanel.local"],
+        nominationSource: "claimant_nominated",
+        isPresiding: false,
+        disclosureText: "No circumstances giving rise to justifiable doubts as to independence or impartiality.",
+        disclosureFiledAt: now,
+        acceptedAt: now,
+      },
+      {
+        tribunalId: tribunal.id,
+        arbitratorUserId: users["co.arbitrator@odrpanel.local"],
+        nominationSource: "respondent_nominated",
+        isPresiding: false,
+        disclosureText: "No circumstances giving rise to justifiable doubts as to independence or impartiality.",
+        disclosureFiledAt: now,
+        acceptedAt: now,
+      },
+      {
+        tribunalId: tribunal.id,
+        arbitratorUserId: users["presiding.arbitrator@odrpanel.local"],
+        nominationSource: "co_arbitrator_nominated",
+        isPresiding: true,
+        disclosureText: "No circumstances giving rise to justifiable doubts as to independence or impartiality.",
+        disclosureFiledAt: now,
+        acceptedAt: now,
+      },
+    ],
+  });
+
+  // Parties, with designation labels computed the same way the app does.
+  const claimant = await prisma.party.create({
+    data: {
+      referenceId: kase.id,
+      designation: "claimant",
+      sequenceNo: null,
+      displayLabel: "Claimant",
+      fullName: "Meridian Infrastructure Pvt. Ltd.",
+      organisation: "Meridian Infrastructure Pvt. Ltd.",
+      email: "claimant@odrpanel.local",
+      phone: "+91 98100 00001",
+      postalAddress: "12 Nehru Place, New Delhi",
+      partyUserId: users["claimant@odrpanel.local"],
+      representedByCounselUserId: users["counsel@odrpanel.local"],
+      thirdPartyFunderDisclosed: false,
+    },
+  });
+  const respondent = await prisma.party.create({
+    data: {
+      referenceId: kase.id,
+      designation: "respondent",
+      sequenceNo: null,
+      displayLabel: "Respondent",
+      fullName: "Coastal Developers Ltd.",
+      organisation: "Coastal Developers Ltd.",
+      email: "respondent@odrpanel.local",
+      phone: "+91 98100 00002",
+      postalAddress: "45 Marine Drive, Mumbai",
+      partyUserId: users["respondent@odrpanel.local"],
+      thirdPartyFunderDisclosed: false,
+    },
+  });
+
+  for (const [userId, roleName] of [
+    [users["claimant@odrpanel.local"], "Party"],
+    [users["counsel@odrpanel.local"], "Counsel"],
+    [users["respondent@odrpanel.local"], "Party"],
+    [users["arbitrator@odrpanel.local"], "Arbitrator"],
+    [users["co.arbitrator@odrpanel.local"], "Arbitrator"],
+    [users["presiding.arbitrator@odrpanel.local"], "Arbitrator"],
+    [users["registrar@odrpanel.local"], "Registrar"],
+    [users["appointing.authority@odrpanel.local"], "Appointing Authority"],
+    [users["case.manager@odrpanel.local"], "Case Manager"],
+    [users["tribunal.secretary@odrpanel.local"], "Tribunal Secretary"],
+  ] as const) {
+    const role = await prisma.role.findUnique({ where: { name: roleName } });
+    if (!role) continue;
+    await prisma.referenceRoleAssignment.upsert({
+      where: { referenceId_userId_roleId: { referenceId: kase.id, userId, roleId: role.id } },
+      update: {},
+      create: { referenceId: kase.id, userId, roleId: role.id },
+    });
+  }
+
+  // Pleadings.
+  await prisma.pleading.createMany({
+    data: [
+      {
+        referenceId: kase.id,
+        pleadingType: "statement_of_claim",
+        title: "Statement of Claim",
+        versionNo: 1,
+        confidentialityFlag: true,
+        filedByUserId: users["counsel@odrpanel.local"],
+        status: "admitted",
+        filedAt: subDays(now, 60),
+      },
+      {
+        referenceId: kase.id,
+        pleadingType: "statement_of_defence",
+        title: "Statement of Defence",
+        versionNo: 1,
+        confidentialityFlag: true,
+        filedByUserId: users["respondent@odrpanel.local"],
+        status: "admitted",
+        filedAt: subDays(now, 30),
+      },
+    ],
+  });
+
+  // Hearings: a completed CMC and an upcoming evidentiary hearing.
+  await prisma.hearing.create({
+    data: {
+      referenceId: kase.id,
+      hearingType: "case_management_conference",
+      mode: "virtual",
+      scheduledStart: subDays(now, 45),
+      scheduledEnd: subDays(now, 45),
+      venueOrLink: "simulated-video://local-evaluation-build/room/cmc-1",
+      cybersecurityProtocolSignedOff: true,
+      status: "completed",
+      recordingRef: "cmc-1-recording.mp4",
+    },
+  });
+  await prisma.hearing.create({
+    data: {
+      referenceId: kase.id,
+      hearingType: "evidentiary",
+      mode: "hybrid",
+      scheduledStart: addDays(now, 21),
+      cybersecurityProtocolSignedOff: true,
+      status: "scheduled",
+      venueOrLink: "simulated-video://local-evaluation-build/room/evidentiary-1",
+    },
+  });
+
+  // Evidence.
+  await prisma.evidence.create({
+    data: {
+      referenceId: kase.id,
+      exhibitNo: "EX-1",
+      title: "EPC Contract dated 4 January 2024",
+      evidenceCategory: "documentary",
+      integrityHash: crypto.createHash("sha256").update("demo-exhibit-1").digest("hex"),
+      objectionStatus: "none",
+      filedByUserId: users["counsel@odrpanel.local"],
+      filedAt: subDays(now, 55),
+    },
+  });
+
+  // Procedural Order No. 1, decomposed into directions.
+  await prisma.proceduralDirection.createMany({
+    data: [
+      {
+        referenceId: kase.id,
+        proceduralOrderNo: 1,
+        description: "Claimant to file Statement of Claim.",
+        responsibleRole: "party",
+        responsiblePartyId: claimant.id,
+        dueDate: subDays(now, 60),
+        status: "complied",
+        phase: "single",
+        createdByUserId: users["presiding.arbitrator@odrpanel.local"],
+      },
+      {
+        referenceId: kase.id,
+        proceduralOrderNo: 1,
+        description: "Respondent to file Statement of Defence.",
+        responsibleRole: "party",
+        responsiblePartyId: respondent.id,
+        dueDate: subDays(now, 30),
+        status: "complied",
+        phase: "single",
+        createdByUserId: users["presiding.arbitrator@odrpanel.local"],
+      },
+      {
+        referenceId: kase.id,
+        proceduralOrderNo: 1,
+        description: "Parties to exchange document production requests (Redfern Schedule).",
+        responsibleRole: "counsel",
+        dueDate: addDays(now, 7),
+        status: "pending",
+        phase: "single",
+        createdByUserId: users["presiding.arbitrator@odrpanel.local"],
+      },
+    ],
+  });
+
+  // Cost ledger.
+  await prisma.costLedgerEntry.createMany({
+    data: [
+      {
+        referenceId: kase.id,
+        entryType: "fee",
+        feeModel: "ad_valorem",
+        payerAllocation: "shared_equally",
+        amount: 1500000,
+        currency: "INR",
+        description: "Tribunal fees (ad valorem, per institution schedule)",
+        raisedByUserId: users["registrar@odrpanel.local"],
+        status: "invoiced",
+      },
+      {
+        referenceId: kase.id,
+        entryType: "escrow",
+        feeModel: "fixed_lump_sum",
+        payerAllocation: "shared_equally",
+        amount: 500000,
+        currency: "INR",
+        description: "Advance on costs, held in escrow",
+        escrowReference: "ESCROW-DEMO-0001",
+        raisedByUserId: users["registrar@odrpanel.local"],
+        status: "paid",
+      },
+    ],
+  });
+
+  // Redfern Schedule row, mid-process.
+  await prisma.redfernScheduleRow.create({
+    data: {
+      referenceId: kase.id,
+      rowNo: 1,
+      documentsRequested: "All internal correspondence regarding the extension-of-time claim, January-March 2024.",
+      requestingReasons: "Directly relevant to causation of the delay in issue.",
+      respondingObjection: "Overbroad; not proportionate to the amount in dispute.",
+      requestingReply: "Narrowed to correspondence between the project managers only.",
+      tribunalDecision: "pending",
+    },
+  });
+
+  // FIDIC condition-precedent record (module enabled on this Reference).
+  await prisma.fIDICDisputeReferral.create({
+    data: {
+      referenceId: kase.id,
+      contractForm: "FIDIC Red Book",
+      dabDaabReferralEvidenced: true,
+      noticeOfDissatisfactionEvidenced: true,
+      coolingOffEvidenced: false,
+      engineerDeterminationLog: [{ text: "Engineer determined EOT claim partially valid (14 days).", at: subDays(now, 200).toISOString() }],
+      dabDecisionLog: [{ text: "DAB upheld the Engineer's determination on 12 days.", at: subDays(now, 150).toISOString() }],
+    },
+  });
+
+  // A published procedural Order.
+  await prisma.order.create({
+    data: {
+      referenceId: kase.id,
+      orderType: "procedural",
+      title: "Procedural Order No. 1",
+      contentText:
+        "1. The procedural timetable at Annexure A is adopted.\n2. The language of the proceedings shall be English.\n3. The seat of arbitration is New Delhi.",
+      draftedByUserId: users["tribunal.secretary@odrpanel.local"],
+      publishedByUserId: users["presiding.arbitrator@odrpanel.local"],
+      publishedAt: subDays(now, 62),
+      status: "published",
+    },
+  });
+
+  console.log(`Seeded demo Reference ${kase.referenceNumber}.`);
+}
+
 async function main() {
   console.log("Seeding institution...");
   await seedInstitution();
@@ -291,10 +603,13 @@ async function main() {
   await seedFeatureFlags();
 
   console.log("Seeding demo user accounts (one per Platform role)...");
-  await seedUsers(roleIds);
+  const userIds = await seedUsers(roleIds);
 
   console.log("Seeding jurisdiction-specific templates...");
   await seedTemplates(profileIds);
+
+  console.log("Seeding a populated demo Reference...");
+  await seedDemoCase(userIds, profileIds);
 
   console.log("\nDone. Demo accounts (all use the same password):");
   console.log(`  Password: ${DEMO_PASSWORD}`);
