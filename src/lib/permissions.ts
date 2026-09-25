@@ -204,7 +204,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRoleName, PermissionSet> = {
     [M.TEMPLATES]: ["view", "create"],
     [M.COUNSEL_CLIENT]: ["view", "create"],
     [M.REDFERN_SCHEDULE]: ["view", "create"],
-    [M.FIDIC]: ["view", "create"],
+    [M.FIDIC]: ["view", "create", "edit"],
     [M.CASE_MASTER_PANEL]: ["view"],
     [M.COURT_ENFORCEMENT]: ["view", "create"],
   },

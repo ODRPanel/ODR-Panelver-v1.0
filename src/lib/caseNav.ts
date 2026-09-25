@@ -17,5 +17,8 @@ export const CASE_NAV_ITEMS: CaseNavItem[] = [
   { label: "Interim Applications", href: "/interim-applications" },
   { label: "Directions (PO No.1)", href: "/directions" },
   { label: "Templates", href: "/templates" },
+  { label: "Counsel-Client", href: "/counsel-client" },
+  { label: "Redfern Schedule", href: "/redfern" },
+  { label: "FIDIC", href: "/fidic" },
   { label: "Case Summary", href: "/summary" },
 ];
