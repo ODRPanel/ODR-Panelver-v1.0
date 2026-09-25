@@ -13,4 +13,5 @@ export const CASE_NAV_ITEMS: CaseNavItem[] = [
   { label: "Costs & Fees", href: "/costs" },
   { label: "Communications", href: "/communications" },
   { label: "Documents", href: "/documents" },
+  { label: "Court / Enforcement", href: "/court-proceedings" },
 ];

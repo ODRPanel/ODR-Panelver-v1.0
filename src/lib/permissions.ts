@@ -106,6 +106,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRoleName, PermissionSet> = {
     [M.REDFERN_SCHEDULE]: ["view"],
     [M.FIDIC]: ["view", "create", "edit"],
     [M.CASE_MASTER_PANEL]: ["view"],
+    [M.COURT_ENFORCEMENT]: ["view", "create", "edit"],
+    [M.COMPLIANCE_BREACH]: ["view"],
   },
 
   // Decides; does not administer (Annexure A-3).
@@ -204,6 +206,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRoleName, PermissionSet> = {
     [M.REDFERN_SCHEDULE]: ["view", "create"],
     [M.FIDIC]: ["view", "create"],
     [M.CASE_MASTER_PANEL]: ["view"],
+    [M.COURT_ENFORCEMENT]: ["view", "create"],
   },
 
   // View-only compliance oversight across every module; never Counsel-Client

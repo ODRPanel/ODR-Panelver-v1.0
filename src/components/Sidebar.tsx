@@ -11,7 +11,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: "References (Cases)", href: "/cases" },
   { label: "New Reference", href: "/cases/new", moduleKey: MODULE_KEYS.CASE_INITIATION },
   { label: "Reports & MIS", href: "/reports", moduleKey: MODULE_KEYS.SEARCH_MIS },
-  { label: "Compliance & Breach Incidents", href: "/compliance", moduleKey: MODULE_KEYS.COMPLIANCE_BREACH },
+  // No moduleKey gate: the grievance channel on this page is open to
+  // every role (Section 5.14); the page itself further-gates the
+  // breach-incident console to the roles that hold it.
+  { label: "Compliance & Grievances", href: "/compliance" },
   { label: "Audit Trail", href: "/audit", moduleKey: MODULE_KEYS.AUDIT_TRAIL },
   { label: "Support Console", href: "/support", moduleKey: MODULE_KEYS.SUPPORT },
   { label: "Records Retention", href: "/retention", moduleKey: MODULE_KEYS.RETENTION },
