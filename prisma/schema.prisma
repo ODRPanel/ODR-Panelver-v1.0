@@ -1,0 +1,1070 @@
+// ODR & Case Management Platform for Arbitrators
+// Prisma schema implementing the data dictionary at Annexure B, Section 3
+// of the SOW/SRS Version 5.0, plus supporting entities needed to make the
+// specification operable as a working application.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum ProfileCode {
+  INDIA
+  DIAC
+  SIAC
+  LCIA
+  ICC
+  USA
+}
+
+enum ConfidentialityDefault {
+  confidential_by_default
+  general_duty
+  no_default
+}
+
+enum FeeScheduleType {
+  ad_valorem
+  hourly
+  institution_own
+}
+
+enum InstitutionType {
+  institutional
+  ad_hoc_platform
+}
+
+enum UserStatus {
+  active
+  suspended
+  pending
+}
+
+enum CaseType {
+  ad_hoc
+  institutional
+}
+
+enum CaseStatus {
+  constitution
+  pleadings
+  hearings
+  award
+  post_award
+  closed
+}
+
+enum RoleApplicability {
+  ad_hoc
+  institutional
+  both
+}
+
+enum PartyDesignation {
+  claimant
+  applicant
+  respondent
+  counter_claimant
+  cross_claimant
+  cross_respondent
+}
+
+enum TribunalCompositionType {
+  sole
+  three_member
+  five_member
+  other_odd_number
+}
+
+enum TribunalStatus {
+  nominating
+  constituted
+  reconstituted
+}
+
+enum NominationSource {
+  claimant_nominated
+  respondent_nominated
+  co_arbitrator_nominated
+  institution_appointed
+  party_agreed_sole
+}
+
+enum PleadingType {
+  statement_of_claim
+  statement_of_defence
+  counter_claim
+  reply
+  rejoinder
+  challenge_application
+  application
+  other
+}
+
+enum PleadingStatus {
+  draft
+  filed
+  admitted
+  rejected
+}
+
+enum HearingType {
+  case_management_conference
+  procedural
+  evidentiary
+  final
+}
+
+enum HearingMode {
+  in_person
+  virtual
+  hybrid
+}
+
+enum HearingStatus {
+  scheduled
+  completed
+  adjourned
+  cancelled
+}
+
+enum EvidenceCategory {
+  documentary
+  expert_report
+  witness_statement
+}
+
+enum ObjectionStatus {
+  none
+  raised
+  ruled
+}
+
+enum OrderType {
+  procedural
+  interim
+  award
+  consent_award
+  correction
+  interpretation
+  additional_award
+}
+
+enum OrderStatus {
+  draft
+  published
+}
+
+enum CostEntryType {
+  fee
+  expense
+  escrow
+  security_for_costs
+}
+
+enum FeeModel {
+  ad_valorem
+  hourly
+  per_sitting
+  fixed_lump_sum
+  ad_hoc
+  institution_own
+}
+
+enum PayerAllocation {
+  claimant
+  respondent
+  shared_equally
+  apportioned_by_tribunal
+  costs_follow_event_pending
+}
+
+enum CostEntryStatus {
+  raised
+  invoiced
+  paid
+  disputed
+  under_review
+  resolved
+}
+
+enum CourtProvisionType {
+  interim_relief
+  appointment
+  evidence_assistance
+  timeline_extension
+  challenge_setaside
+  enforcement
+  appeal
+}
+
+enum CourtStatus {
+  filed
+  pending
+  disposed
+  stayed
+}
+
+enum BreachSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum BreachStatus {
+  open
+  notified
+  closed
+}
+
+enum GrievanceAgainst {
+  institution
+  arbitrator
+}
+
+enum GrievanceStatus {
+  open
+  investigating
+  resolved
+}
+
+enum WorkspaceType {
+  native_canvas
+  liquidtext_export
+}
+
+enum VisibilityScope {
+  tribunal_only
+  shared
+}
+
+enum AIRequestType {
+  summary
+  chronology
+  draft_assist
+  conflict_flag
+}
+
+enum AIDecision {
+  pending
+  accepted
+  edited_and_accepted
+  discarded
+}
+
+enum DocumentCategory {
+  pleading
+  evidence
+  order
+  template
+  general
+  counsel_client_promoted
+}
+
+enum NotificationChannel {
+  in_platform
+  email
+  post
+  whatsapp
+  sms
+  process_server
+}
+
+enum FeedbackStatus {
+  new
+  triaged
+  scheduled
+  shipped
+}
+
+enum InterimApplicationType {
+  interim_measure_to_tribunal
+  other
+}
+
+enum InterimDecision {
+  pending
+  granted
+  refused
+  varied
+}
+
+enum DirectionStatus {
+  pending
+  complied
+  overdue
+  varied
+}
+
+enum DirectionPhase {
+  single
+  jurisdiction
+  liability
+  quantum
+}
+
+enum ResponsibleRoleType {
+  tribunal
+  party
+  counsel
+  registrar
+  other
+}
+
+enum TemplateType {
+  notice_of_arbitration
+  answer
+  procedural_order_1
+  terms_of_reference
+  institution_form
+  custom
+}
+
+enum RedfernDecision {
+  pending
+  produce
+  refuse
+  produce_with_conditions
+}
+
+enum FeatureFlagScope {
+  platform
+  institution
+  reference
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy, Identity, Roles (Modules 5.11)
+// ---------------------------------------------------------------------------
+
+model Institution {
+  id        String          @id @default(uuid())
+  name      String
+  type      InstitutionType @default(institutional)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  users        User[]
+  cases        Case[]
+  auditLogs    AuditLogEntry[]
+  templates    Template[]      @relation("TemplateOwnerInstitution")
+  featureFlags FeatureFlag[]
+}
+
+model Role {
+  id            String            @id @default(uuid())
+  name          String            @unique
+  description   String?
+  applicability RoleApplicability @default(both)
+  permissionSet Json
+  isSystem      Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  users       User[]
+  assignments ReferenceRoleAssignment[]
+}
+
+model User {
+  id            String       @id @default(uuid())
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id])
+  fullName      String
+  email         String       @unique
+  passwordHash  String
+  roleId        String
+  role          Role         @relation(fields: [roleId], references: [id])
+  mfaEnabled    Boolean      @default(false)
+  mfaSecret     String?
+  status        UserStatus   @default(active)
+  tokenVersion  Int          @default(0)
+  isDeleted     Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  referenceAssignments ReferenceRoleAssignment[]
+  casesCreated         Case[]                    @relation("CaseCreatedBy")
+  partiesAsUser        Party[]                   @relation("PartyUser")
+  partiesRepresented   Party[]                   @relation("PartyCounsel")
+  tribunalMemberships  TribunalMember[]
+  pleadingsFiled       Pleading[]                @relation("PleadingFiledBy")
+  evidenceFiled        Evidence[]                @relation("EvidenceFiledBy")
+  ordersDrafted        Order[]                   @relation("OrderDraftedBy")
+  ordersPublished      Order[]                   @relation("OrderPublishedBy")
+  settlementsRecorded  Settlement[]
+  costEntriesRaised    CostLedgerEntry[]
+  breachIncidentsOwned BreachIncident[]          @relation("BreachOwner")
+  grievancesRaised     GrievanceTicket[]         @relation("GrievanceRaisedBy")
+  grievancesHandled    GrievanceTicket[]         @relation("GrievanceInvestigatedBy")
+  workspacesCreated    LiquidTextWorkspace[]
+  aiJobsRequested      AIAnalysisJob[]           @relation("AIRequestedBy")
+  aiJobsDecided        AIAnalysisJob[]           @relation("AIDecidedBy")
+  documentsUploaded    DocumentRepositoryItem[]
+  feedbackSubmitted    FeedbackTicket[]
+  interimApplications  InterimApplication[]
+  directionsCreated    ProceduralDirection[]
+  counselMessagesSent  CounselClientMessage[]    @relation("MessageSender")
+  counselDocsUploaded  CounselClientDocument[]
+  auditLogEntries      AuditLogEntry[]
+}
+
+model ReferenceRoleAssignment {
+  id            String            @id @default(uuid())
+  referenceId   String
+  reference     Case              @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User              @relation(fields: [userId], references: [id])
+  roleId        String
+  role          Role              @relation(fields: [roleId], references: [id])
+  applicability RoleApplicability @default(both)
+  createdAt     DateTime          @default(now())
+
+  @@unique([referenceId, userId, roleId])
+}
+
+// ---------------------------------------------------------------------------
+// Jurisdiction Rule Engine (Section 3.2 Annexure B)
+// ---------------------------------------------------------------------------
+
+model JurisdictionProfile {
+  id                          String                 @id @default(uuid())
+  profileCode                 ProfileCode            @unique
+  displayName                 String
+  governingArbitrationLaw     String
+  evidenceRegime              String
+  confidentialityDefault      ConfidentialityDefault
+  feeScheduleType             FeeScheduleType
+  defaultCurrency             String
+  dataResidencyRegion         String
+  uiLanguageDefault           String                 @default("en")
+  rtlSupport                  Boolean                @default(false)
+  applicableDataProtectionLaw String
+  breachNotificationHours     Int                    @default(72)
+  timelineRules               Json
+  createdAt                   DateTime               @default(now())
+  updatedAt                   DateTime               @updatedAt
+
+  cases     Case[]
+  templates Template[]
+}
+
+// ---------------------------------------------------------------------------
+// Case / Reference and related entities (Modules 5.1-5.5)
+// ---------------------------------------------------------------------------
+
+model Case {
+  id                      String              @id @default(uuid())
+  institutionId           String?
+  institution             Institution?        @relation(fields: [institutionId], references: [id])
+  referenceNumber         String              @unique
+  title                   String
+  jurisdictionProfileId   String
+  jurisdictionProfile     JurisdictionProfile @relation(fields: [jurisdictionProfileId], references: [id])
+  type                    CaseType
+  seat                    String?
+  competentCourt          String?
+  ledgerCurrency          String
+  status                  CaseStatus          @default(constitution)
+  timelineStartDate       DateTime?
+  timelineDeadline        DateTime?
+  retentionPeriodMonths   Int?
+  fidicEnabled            Boolean             @default(false)
+  aiEnabled               Boolean             @default(false)
+  confidentialityAccepted Boolean             @default(false)
+  createdByUserId         String
+  createdByUser           User                @relation("CaseCreatedBy", fields: [createdByUserId], references: [id])
+  isDeleted               Boolean             @default(false)
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  roleAssignments      ReferenceRoleAssignment[]
+  parties              Party[]
+  tribunal             Tribunal?
+  pleadings            Pleading[]
+  hearings             Hearing[]
+  evidence             Evidence[]
+  orders               Order[]
+  settlements          Settlement[]
+  costEntries          CostLedgerEntry[]
+  courtProceedings     CourtProceeding[]
+  breachIncidents      BreachIncident[]
+  grievances           GrievanceTicket[]
+  workspaces           LiquidTextWorkspace[]
+  aiJobs               AIAnalysisJob[]
+  documents            DocumentRepositoryItem[]
+  notifications        Notification[]
+  auditLogEntries      AuditLogEntry[]
+  interimApplications  InterimApplication[]
+  proceduralDirections ProceduralDirection[]
+  counselMessages      CounselClientMessage[]
+  counselDocuments     CounselClientDocument[]
+  redfernRows          RedfernScheduleRow[]
+  fidicReferral        FIDICDisputeReferral?
+}
+
+model Party {
+  id                         String           @id @default(uuid())
+  referenceId                String
+  reference                  Case             @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  designation                PartyDesignation
+  sequenceNo                 Int?
+  displayLabel               String
+  partyUserId                String?
+  partyUser                  User?            @relation("PartyUser", fields: [partyUserId], references: [id])
+  representedByCounselUserId String?
+  representedByCounsel       User?            @relation("PartyCounsel", fields: [representedByCounselUserId], references: [id])
+  fullName                   String
+  organisation               String?
+  email                      String?
+  phone                      String?
+  postalAddress              String?
+  thirdPartyFunderDisclosed  Boolean          @default(false)
+  thirdPartyFunderDetails    String?
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
+
+  tribunalMembersNominated TribunalMember[]
+  interimApplicationsFiled InterimApplication[]
+  directionsResponsible    ProceduralDirection[]
+  counselMessages          CounselClientMessage[]
+  counselDocuments         CounselClientDocument[]
+
+  @@index([referenceId])
+}
+
+model Tribunal {
+  id              String                  @id @default(uuid())
+  referenceId     String                  @unique
+  reference       Case                    @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  compositionType TribunalCompositionType
+  status          TribunalStatus          @default(nominating)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  members TribunalMember[]
+}
+
+model TribunalMember {
+  id                 String           @id @default(uuid())
+  tribunalId         String
+  tribunal           Tribunal         @relation(fields: [tribunalId], references: [id], onDelete: Cascade)
+  arbitratorUserId   String
+  arbitratorUser     User             @relation(fields: [arbitratorUserId], references: [id])
+  nominationSource   NominationSource
+  nominatedByPartyId String?
+  nominatedByParty   Party?           @relation(fields: [nominatedByPartyId], references: [id])
+  isPresiding        Boolean          @default(false)
+  disclosureText     String?
+  disclosureFiledAt  DateTime?
+  acceptedAt         DateTime?
+  createdAt          DateTime         @default(now())
+
+  @@unique([tribunalId, arbitratorUserId])
+}
+
+model Pleading {
+  id                  String                  @id @default(uuid())
+  referenceId         String
+  reference           Case                    @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  pleadingType        PleadingType
+  title               String
+  versionNo           Int                     @default(1)
+  confidentialityFlag Boolean                 @default(true)
+  filedByUserId       String
+  filedByUser         User                    @relation("PleadingFiledBy", fields: [filedByUserId], references: [id])
+  documentId          String?
+  document            DocumentRepositoryItem? @relation(fields: [documentId], references: [id])
+  status              PleadingStatus          @default(filed)
+  filedAt             DateTime                @default(now())
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  @@index([referenceId])
+}
+
+model Hearing {
+  id                             String        @id @default(uuid())
+  referenceId                    String
+  reference                      Case          @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  hearingType                    HearingType   @default(procedural)
+  mode                           HearingMode   @default(virtual)
+  scheduledStart                 DateTime
+  scheduledEnd                   DateTime?
+  venueOrLink                    String?
+  interpreterRequired            Boolean       @default(false)
+  interpreterLanguage            String?
+  observerAccess                 Boolean       @default(false)
+  cybersecurityProtocolSignedOff Boolean       @default(false)
+  recordingRef                   String?
+  transcriptRef                  String?
+  transcriptHash                 String?
+  status                         HearingStatus @default(scheduled)
+  createdAt                      DateTime      @default(now())
+  updatedAt                      DateTime      @updatedAt
+
+  costEntries CostLedgerEntry[]
+
+  @@index([referenceId])
+}
+
+model Evidence {
+  id               String                  @id @default(uuid())
+  referenceId      String
+  reference        Case                    @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  exhibitNo        String
+  title            String
+  evidenceCategory EvidenceCategory        @default(documentary)
+  documentId       String?
+  document         DocumentRepositoryItem? @relation(fields: [documentId], references: [id])
+  integrityHash    String?
+  objectionStatus  ObjectionStatus         @default(none)
+  objectionText    String?
+  rulingText       String?
+  filedByUserId    String
+  filedByUser      User                    @relation("EvidenceFiledBy", fields: [filedByUserId], references: [id])
+  filedAt          DateTime                @default(now())
+
+  redfernRow RedfernScheduleRow[]
+
+  @@unique([referenceId, exhibitNo])
+}
+
+model Order {
+  id                     String                  @id @default(uuid())
+  referenceId            String
+  reference              Case                    @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  orderType              OrderType
+  title                  String
+  versionNo              Int                     @default(1)
+  documentId             String?
+  document               DocumentRepositoryItem? @relation(fields: [documentId], references: [id])
+  contentText            String?
+  draftedByUserId        String
+  draftedByUser          User                    @relation("OrderDraftedBy", fields: [draftedByUserId], references: [id])
+  publishedByUserId      String?
+  publishedByUser        User?                   @relation("OrderPublishedBy", fields: [publishedByUserId], references: [id])
+  publishedAt            DateTime?
+  status                 OrderStatus             @default(draft)
+  dissentText            String?
+  majorityText           String?
+  settlementRefId        String?
+  settlementRef          Settlement?             @relation(fields: [settlementRefId], references: [id])
+  interestRatePreAward   Float?
+  interestRatePostAward  Float?
+  enforcementCurrency    String?
+  costsApportionmentText String?
+  aiAssisted             Boolean                 @default(false)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  costSecurityEntries CostLedgerEntry[] @relation("OrderSecurity")
+
+  @@index([referenceId])
+}
+
+model Settlement {
+  id               String   @id @default(uuid())
+  referenceId      String
+  reference        Case     @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  description      String
+  settledAt        DateTime @default(now())
+  recordedByUserId String
+  recordedByUser   User     @relation(fields: [recordedByUserId], references: [id])
+
+  orders Order[]
+}
+
+// ---------------------------------------------------------------------------
+// Costs, Fees & Billing (Module 5.7)
+// ---------------------------------------------------------------------------
+
+model CostLedgerEntry {
+  id              String          @id @default(uuid())
+  referenceId     String
+  reference       Case            @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  entryType       CostEntryType
+  feeModel        FeeModel
+  payerAllocation PayerAllocation
+  linkedHearingId String?
+  linkedHearing   Hearing?        @relation(fields: [linkedHearingId], references: [id])
+  amount          Decimal         @db.Decimal(14, 2)
+  currency        String
+  escrowReference String?
+  linkedOrderId   String?
+  linkedOrder     Order?          @relation("OrderSecurity", fields: [linkedOrderId], references: [id])
+  description     String?
+  status          CostEntryStatus @default(raised)
+  raisedByUserId  String
+  raisedByUser    User            @relation(fields: [raisedByUserId], references: [id])
+  raisedAt        DateTime        @default(now())
+
+  interimApplicationSecurity InterimApplication[]
+
+  @@index([referenceId])
+}
+
+// ---------------------------------------------------------------------------
+// Court / Enforcement Tracker (Module 5.13)
+// ---------------------------------------------------------------------------
+
+model CourtProceeding {
+  id                 String             @id @default(uuid())
+  referenceId        String
+  reference          Case               @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  provisionType      CourtProvisionType
+  provisionReference String?
+  courtOrBody        String
+  courtCaseNo        String?
+  status             CourtStatus        @default(filed)
+  impactOnTimeline   String?
+  nycArticleVGround  String?
+  filedAt            DateTime           @default(now())
+  disposedAt         DateTime?
+
+  @@index([referenceId])
+}
+
+// ---------------------------------------------------------------------------
+// Compliance & Breach-Incident Management (Module 5.14)
+// ---------------------------------------------------------------------------
+
+model BreachIncident {
+  id                     String         @id @default(uuid())
+  referenceId            String?
+  reference              Case?          @relation(fields: [referenceId], references: [id])
+  detectedAt             DateTime       @default(now())
+  clientNotifiedAt       DateTime?
+  regulatorNotifiedAt    DateTime?
+  severity               BreachSeverity
+  description            String
+  remediationNote        String?
+  status                 BreachStatus   @default(open)
+  ownerUserId            String
+  ownerUser              User           @relation("BreachOwner", fields: [ownerUserId], references: [id])
+  notificationDeadlineAt DateTime?
+
+  @@index([referenceId])
+}
+
+model GrievanceTicket {
+  id                   String           @id @default(uuid())
+  referenceId          String?
+  reference            Case?            @relation(fields: [referenceId], references: [id])
+  raisedByUserId       String
+  raisedByUser         User             @relation("GrievanceRaisedBy", fields: [raisedByUserId], references: [id])
+  against              GrievanceAgainst
+  subject              String
+  description          String
+  status               GrievanceStatus  @default(open)
+  investigatedByUserId String?
+  investigatedByUser   User?            @relation("GrievanceInvestigatedBy", fields: [investigatedByUserId], references: [id])
+  outcomeText          String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Document Intelligence / Native Canvas (Module 5.15) & AI Layer (5.16)
+// ---------------------------------------------------------------------------
+
+model LiquidTextWorkspace {
+  id               String                  @id @default(uuid())
+  referenceId      String
+  reference        Case                    @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  workspaceType    WorkspaceType           @default(native_canvas)
+  title            String
+  sourceDocumentId String?
+  sourceDocument   DocumentRepositoryItem? @relation(fields: [sourceDocumentId], references: [id])
+  annotationLayer  Json
+  versionNo        Int                     @default(1)
+  visibilityScope  VisibilityScope         @default(tribunal_only)
+  createdByUserId  String
+  createdByUser    User                    @relation(fields: [createdByUserId], references: [id])
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([referenceId])
+}
+
+model AIAnalysisJob {
+  id                String        @id @default(uuid())
+  referenceId       String
+  reference         Case          @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  requestType       AIRequestType
+  inputDocumentIds  String[]
+  outputText        String?
+  decision          AIDecision    @default(pending)
+  decidedByUserId   String?
+  decidedByUser     User?         @relation("AIDecidedBy", fields: [decidedByUserId], references: [id])
+  requestedByUserId String
+  requestedByUser   User          @relation("AIRequestedBy", fields: [requestedByUserId], references: [id])
+  createdAt         DateTime      @default(now())
+  decidedAt         DateTime?
+
+  @@index([referenceId])
+}
+
+// ---------------------------------------------------------------------------
+// Document Repository (Module 5.9)
+// ---------------------------------------------------------------------------
+
+model DocumentRepositoryItem {
+  id                   String           @id @default(uuid())
+  referenceId          String
+  reference            Case             @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  fileName             String
+  storagePath          String
+  mimeType             String
+  sizeBytes            Int
+  sha256Hash           String
+  confidentialityFlag  Boolean          @default(true)
+  translationCertified Boolean          @default(false)
+  category             DocumentCategory @default(general)
+  uploadedByUserId     String
+  uploadedByUser       User             @relation(fields: [uploadedByUserId], references: [id])
+  uploadedAt           DateTime         @default(now())
+
+  pleadings           Pleading[]
+  evidence            Evidence[]
+  orders              Order[]
+  workspaces          LiquidTextWorkspace[]
+  promotedFromCounsel CounselClientDocument[]
+
+  @@index([referenceId])
+}
+
+// ---------------------------------------------------------------------------
+// Communication & Notification (Module 5.8)
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id                String              @id @default(uuid())
+  referenceId       String?
+  reference         Case?               @relation(fields: [referenceId], references: [id])
+  recipientPartyId  String?
+  recipientUserId   String?
+  channel           NotificationChannel
+  subject           String
+  body              String
+  contentRefType    String?
+  contentRefId      String?
+  dispatchedAt      DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  proofOfServiceRef String?
+  deemedServiceDate DateTime?
+  createdAt         DateTime            @default(now())
+
+  @@index([referenceId])
+}
+
+// ---------------------------------------------------------------------------
+// Compliance & Audit Trail (Module 5.12), Feedback (Section 2.3 Annexure B)
+// ---------------------------------------------------------------------------
+
+model AuditLogEntry {
+  id            String       @id @default(uuid())
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id])
+  referenceId   String?
+  reference     Case?        @relation(fields: [referenceId], references: [id])
+  action        String
+  actorUserId   String?
+  actorUser     User?        @relation(fields: [actorUserId], references: [id])
+  entityType    String?
+  entityId      String?
+  metadata      Json?
+  immutableHash String
+  createdAt     DateTime     @default(now())
+
+  @@index([referenceId])
+  @@index([institutionId])
+}
+
+model FeedbackTicket {
+  id                String         @id @default(uuid())
+  module            String
+  submittedByUserId String
+  submittedByUser   User           @relation(fields: [submittedByUserId], references: [id])
+  description       String
+  status            FeedbackStatus @default(new)
+  createdAt         DateTime       @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Interim & Emergency Applications (Module 5.17)
+// ---------------------------------------------------------------------------
+
+model InterimApplication {
+  id                      String                 @id @default(uuid())
+  referenceId             String
+  reference               Case                   @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  applicationType         InterimApplicationType @default(interim_measure_to_tribunal)
+  title                   String
+  description             String
+  filedByPartyId          String
+  filedByParty            Party                  @relation(fields: [filedByPartyId], references: [id])
+  filedByUserId           String
+  filedByUser             User                   @relation(fields: [filedByUserId], references: [id])
+  filedAt                 DateTime               @default(now())
+  oppositionDueAt         DateTime?
+  decisionDueAt           DateTime?
+  oppositionText          String?
+  decision                InterimDecision        @default(pending)
+  decisionText            String?
+  decidedAt               DateTime?
+  securityOrderedLedgerId String?
+  securityOrderedLedger   CostLedgerEntry?       @relation(fields: [securityOrderedLedgerId], references: [id])
+
+  @@index([referenceId])
+}
+
+// ---------------------------------------------------------------------------
+// Case Management Conferences, Directions & Procedural Order No.1 (5.18)
+// ---------------------------------------------------------------------------
+
+model ProceduralDirection {
+  id                 String              @id @default(uuid())
+  referenceId        String
+  reference          Case                @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  proceduralOrderNo  Int                 @default(1)
+  supersedesOrderNo  Int?
+  description        String
+  responsibleRole    ResponsibleRoleType @default(tribunal)
+  responsiblePartyId String?
+  responsibleParty   Party?              @relation(fields: [responsiblePartyId], references: [id])
+  dueDate            DateTime?
+  status             DirectionStatus     @default(pending)
+  phase              DirectionPhase      @default(single)
+  createdByUserId    String
+  createdByUser      User                @relation(fields: [createdByUserId], references: [id])
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([referenceId])
+}
+
+// ---------------------------------------------------------------------------
+// Jurisdiction-Specific Template Library (Module 5.19)
+// ---------------------------------------------------------------------------
+
+model Template {
+  id                    String               @id @default(uuid())
+  jurisdictionProfileId String?
+  jurisdictionProfile   JurisdictionProfile? @relation(fields: [jurisdictionProfileId], references: [id])
+  templateType          TemplateType
+  title                 String
+  ownerInstitutionId    String?
+  ownerInstitution      Institution?         @relation("TemplateOwnerInstitution", fields: [ownerInstitutionId], references: [id])
+  bodyMarkup            String
+  versionNo             Int                  @default(1)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Counsel-Client Privileged Communication & Document Sharing (Module 5.20)
+// ---------------------------------------------------------------------------
+
+model CounselClientMessage {
+  id            String   @id @default(uuid())
+  referenceId   String
+  reference     Case     @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  counselUserId String
+  counselUser   User     @relation("MessageSender", fields: [counselUserId], references: [id])
+  clientPartyId String
+  clientParty   Party    @relation(fields: [clientPartyId], references: [id])
+  body          String
+  sentAt        DateTime @default(now())
+
+  @@index([referenceId, counselUserId, clientPartyId])
+}
+
+model CounselClientDocument {
+  id                         String                  @id @default(uuid())
+  referenceId                String
+  reference                  Case                    @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  counselUserId              String
+  counselUser                User                    @relation(fields: [counselUserId], references: [id])
+  clientPartyId              String
+  clientParty                Party                   @relation(fields: [clientPartyId], references: [id])
+  fileName                   String
+  storagePath                String
+  mimeType                   String
+  sizeBytes                  Int
+  uploadedAt                 DateTime                @default(now())
+  promotedToRepositoryItemId String?
+  promotedToRepositoryItem   DocumentRepositoryItem? @relation(fields: [promotedToRepositoryItemId], references: [id])
+
+  @@index([referenceId, counselUserId, clientPartyId])
+}
+
+// ---------------------------------------------------------------------------
+// Document Production / Discovery Schedule - Redfern Schedule (Module 5.21)
+// ---------------------------------------------------------------------------
+
+model RedfernScheduleRow {
+  id                  String          @id @default(uuid())
+  referenceId         String
+  reference           Case            @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  rowNo               Int
+  documentsRequested  String
+  requestingReasons   String
+  respondingObjection String?
+  requestingReply     String?
+  tribunalDecision    RedfernDecision @default(pending)
+  productionDueDate   DateTime?
+  producedEvidenceId  String?
+  producedEvidence    Evidence?       @relation(fields: [producedEvidenceId], references: [id])
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@unique([referenceId, rowNo])
+}
+
+// ---------------------------------------------------------------------------
+// FIDIC / Multi-Tier Construction Dispute Support (Module 5.22)
+// ---------------------------------------------------------------------------
+
+model FIDICDisputeReferral {
+  id                               String   @id @default(uuid())
+  referenceId                      String   @unique
+  reference                        Case     @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  contractForm                     String
+  dabDaabReferralEvidenced         Boolean  @default(false)
+  noticeOfDissatisfactionEvidenced Boolean  @default(false)
+  coolingOffEvidenced              Boolean  @default(false)
+  engineerDeterminationLog         Json     @default("[]")
+  dabDecisionLog                   Json     @default("[]")
+  eotClaimLog                      Json     @default("[]")
+  variationOrderLog                Json     @default("[]")
+  createdAt                        DateTime @default(now())
+  updatedAt                        DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Feature Flags (Section 8 of SOW/SRS; Section 2.3 of Annexure B)
+// ---------------------------------------------------------------------------
+
+model FeatureFlag {
+  id            String           @id @default(uuid())
+  key           String
+  scope         FeatureFlagScope @default(platform)
+  institutionId String?
+  institution   Institution?     @relation(fields: [institutionId], references: [id])
+  referenceId   String?
+  enabled       Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([key, scope, institutionId, referenceId])
+}
