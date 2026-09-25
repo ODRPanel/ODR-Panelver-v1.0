@@ -5,8 +5,12 @@ type NavItem = { label: string; href: string; moduleKey?: string };
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard" },
-  { label: "References (Cases)", href: "/cases", moduleKey: MODULE_KEYS.SEARCH_MIS },
+  // No moduleKey gate: every role sees their own References list (scoped
+  // server-side by getVisibleCases) - 5.10 below gates the separate,
+  // institution-wide MIS/analytics view, not access to one's own cases.
+  { label: "References (Cases)", href: "/cases" },
   { label: "New Reference", href: "/cases/new", moduleKey: MODULE_KEYS.CASE_INITIATION },
+  { label: "Reports & MIS", href: "/reports", moduleKey: MODULE_KEYS.SEARCH_MIS },
   { label: "Compliance & Breach Incidents", href: "/compliance", moduleKey: MODULE_KEYS.COMPLIANCE_BREACH },
   { label: "Audit Trail", href: "/audit", moduleKey: MODULE_KEYS.AUDIT_TRAIL },
   { label: "Support Console", href: "/support", moduleKey: MODULE_KEYS.SUPPORT },

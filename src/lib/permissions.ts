@@ -96,7 +96,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRoleName, PermissionSet> = {
     [M.TIMELINE]: ["view"],
     [M.COSTS_FEES]: ["view", "create", "edit"],
     [M.COMMUNICATION]: ["view", "create", "edit"],
-    [M.DOCUMENT_REPOSITORY]: ["view", "create"],
+    [M.DOCUMENT_REPOSITORY]: ["view", "create", "edit"],
     [M.SEARCH_MIS]: ["view"],
     [M.USER_ROLE_ACCESS]: ["view", "create", "edit"],
     [M.AUDIT_TRAIL]: ["view"],

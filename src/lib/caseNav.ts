@@ -9,4 +9,8 @@ export const CASE_NAV_ITEMS: CaseNavItem[] = [
   { label: "Hearings", href: "/hearings" },
   { label: "Evidence", href: "/evidence" },
   { label: "Orders & Awards", href: "/orders" },
+  { label: "Timeline", href: "/timeline" },
+  { label: "Costs & Fees", href: "/costs" },
+  { label: "Communications", href: "/communications" },
+  { label: "Documents", href: "/documents" },
 ];
