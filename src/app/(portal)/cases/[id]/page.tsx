@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/rbac";
 import { getCaseForUserOr404 } from "@/lib/queries";
 import { hasPermission, MODULE_KEYS } from "@/lib/permissions";
-import { acceptConfidentialityAction, toggleFidicAction } from "@/actions/case";
+import { acceptConfidentialityAction, toggleFidicAction, updateCompetentCourtAction } from "@/actions/case";
 import { InfoAlert } from "@/components/ui/Alert";
 
 export default async function CaseOverviewPage({ params }: { params: { id: string } }) {
@@ -19,11 +19,19 @@ export default async function CaseOverviewPage({ params }: { params: { id: strin
           <Row label="Reference number" value={kase.referenceNumber} />
           <Row label="Type" value={kase.type} />
           <Row label="Seat" value={kase.seat ?? "Not yet fixed"} />
+          <Row label="Competent court" value={kase.competentCourt ?? "Not yet fixed"} />
           <Row label="Ledger currency" value={kase.ledgerCurrency} />
           <Row label="Governing law" value={kase.jurisdictionProfile.governingArbitrationLaw} />
           <Row label="Confidentiality basis" value={kase.jurisdictionProfile.confidentialityDefault.replace(/_/g, " ")} />
           <Row label="Data residency" value={kase.jurisdictionProfile.dataResidencyRegion} />
         </dl>
+        {canEdit && (
+          <form action={updateCompetentCourtAction} className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4">
+            <input type="hidden" name="referenceId" value={kase.id} />
+            <input className="input" name="competentCourt" placeholder="Competent/supervising court for the seat" defaultValue={kase.competentCourt ?? ""} />
+            <button className="btn-secondary shrink-0" type="submit">Save</button>
+          </form>
+        )}
       </div>
 
       <div className="space-y-6">

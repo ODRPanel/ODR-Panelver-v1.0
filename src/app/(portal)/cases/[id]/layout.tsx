@@ -1,8 +1,10 @@
 import { requireUser } from "@/lib/rbac";
 import { getCaseForUserOr404 } from "@/lib/queries";
+import { prisma } from "@/lib/prisma";
 import { CaseSubNav } from "@/components/CaseSubNav";
 import { CASE_NAV_ITEMS } from "@/lib/caseNav";
 import { DeadlineBanner } from "@/components/ui/DeadlineBanner";
+import { CaseMasterPanelStrip } from "@/components/CaseMasterPanelStrip";
 import { computeTimelineDeadline, daysUntil, getTimelineRules } from "@/lib/jurisdictionEngine";
 import { StatusBadge } from "@/components/ui/Badge";
 
@@ -20,6 +22,13 @@ export default async function CaseLayout({
   const days = daysUntil(deadline);
   const rules = getTimelineRules(kase.jurisdictionProfile);
 
+  const openCourtOrderCount = await prisma.courtProceeding.count({
+    where: { referenceId: kase.id, status: { in: ["filed", "pending", "stayed"] } },
+  });
+  const tribunalLabel = kase.tribunal
+    ? `${kase.tribunal.compositionType.replace(/_/g, " ")} - ${kase.tribunal.status}`
+    : "not yet constituted";
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -34,6 +43,14 @@ export default async function CaseLayout({
       </div>
 
       <DeadlineBanner label={rules.label} daysRemaining={days} deadlineDate={deadline} />
+
+      <CaseMasterPanelStrip
+        caseId={kase.id}
+        seat={kase.seat}
+        competentCourt={kase.competentCourt}
+        tribunalLabel={tribunalLabel}
+        openCourtOrderCount={openCourtOrderCount}
+      />
 
       <CaseSubNav caseId={kase.id} items={CASE_NAV_ITEMS} />
 

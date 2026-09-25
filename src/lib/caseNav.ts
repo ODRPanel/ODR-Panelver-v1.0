@@ -14,4 +14,8 @@ export const CASE_NAV_ITEMS: CaseNavItem[] = [
   { label: "Communications", href: "/communications" },
   { label: "Documents", href: "/documents" },
   { label: "Court / Enforcement", href: "/court-proceedings" },
+  { label: "Interim Applications", href: "/interim-applications" },
+  { label: "Directions (PO No.1)", href: "/directions" },
+  { label: "Templates", href: "/templates" },
+  { label: "Case Summary", href: "/summary" },
 ];

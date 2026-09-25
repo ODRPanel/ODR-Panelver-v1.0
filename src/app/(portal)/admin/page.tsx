@@ -10,6 +10,7 @@ export default async function AdminHomePage() {
     { href: "/admin/users", title: "User, Role & Access Management", desc: "Provision and suspend accounts platform-wide (Module 5.11)." },
     { href: "/admin/jurisdiction-profiles", title: "Jurisdiction Rule Profile Administration", desc: "The six launch profiles and any further jurisdiction added by configuration (Section 3.3)." },
     { href: "/admin/feature-flags", title: "Feature Flags & Module Enablement", desc: "Enable or withhold a module per Institution or Reference (Section 8)." },
+    { href: "/admin/templates", title: "Template Library Administration", desc: "Add Institution/Client house-style templates (Section 5.19)." },
     { href: "/audit", title: "Audit Trail (read-only)", desc: "Immutable system-health log (Module 5.12)." },
   ];
 

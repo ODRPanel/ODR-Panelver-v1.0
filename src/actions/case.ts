@@ -113,6 +113,17 @@ export async function acceptConfidentialityAction(formData: FormData) {
   revalidatePath(`/cases/${referenceId}`);
 }
 
+export async function updateCompetentCourtAction(formData: FormData) {
+  const user = await requireSessionUser();
+  const referenceId = String(formData.get("referenceId"));
+  const competentCourt = String(formData.get("competentCourt") || "");
+  await requirePermission(user, MODULE_KEYS.CASE_INITIATION, "edit", referenceId);
+
+  await prisma.case.update({ where: { id: referenceId }, data: { competentCourt: competentCourt || null } });
+  await writeAudit({ action: "case.competent_court_set", actorUserId: user.id, referenceId, metadata: { competentCourt } });
+  revalidatePath(`/cases/${referenceId}`);
+}
+
 export async function toggleFidicAction(formData: FormData) {
   const user = await requireSessionUser();
   const referenceId = String(formData.get("referenceId"));
