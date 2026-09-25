@@ -1,6 +1,9 @@
 import "server-only";
+import { cache } from "react";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type { CurrentUser } from "@/lib/auth";
+import { hasCaseAccess } from "@/lib/rbac";
 
 const PLATFORM_WIDE_ROLES = [
   "Super Admin",
@@ -28,3 +31,22 @@ export async function getVisibleCases(user: CurrentUser) {
     orderBy: { createdAt: "desc" },
   });
 }
+
+/** Loads a Reference for a case sub-page, enforcing that the requesting
+ * user actually has an assignment on it (or holds a platform-wide
+ * oversight role) before returning any of its content. */
+export const getCaseForUserOr404 = cache(async (referenceId: string, user: CurrentUser) => {
+  const allowed = await hasCaseAccess(user, referenceId);
+  if (!allowed) notFound();
+
+  const kase = await prisma.case.findFirst({
+    where: { id: referenceId, isDeleted: false },
+    include: {
+      jurisdictionProfile: true,
+      parties: { orderBy: { createdAt: "asc" } },
+      tribunal: { include: { members: { include: { arbitratorUser: true, nominatedByParty: true } } } },
+    },
+  });
+  if (!kase) notFound();
+  return kase;
+});
