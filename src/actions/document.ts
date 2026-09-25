@@ -8,6 +8,7 @@ import { requireSessionUser, requirePermission } from "@/lib/rbac";
 import { MODULE_KEYS } from "@/lib/permissions";
 import { writeAudit } from "@/lib/audit";
 import { saveUploadedFile } from "@/lib/storage";
+import { extractTextStub } from "@/lib/adapters/ocr";
 
 function errorRedirect(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -33,6 +34,12 @@ export async function uploadGeneralDocumentAction(formData: FormData) {
   if (!file || file.size === 0) errorRedirect("/cases", "Choose a file to upload.");
 
   const saved = await saveUploadedFile(parsed.data.referenceId, file);
+  // OCR / full-text-search integration point (Section 5.9/5.10) - a
+  // production deployment indexes the extracted text into the per-region
+  // search index described in Annexure B, Section 3.25, not PostgreSQL
+  // directly; this local build just demonstrates the call site.
+  await extractTextStub(saved.fileName);
+
   const doc = await prisma.documentRepositoryItem.create({
     data: {
       referenceId: parsed.data.referenceId,

@@ -2,6 +2,7 @@ import "server-only";
 import { addDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import type { NotificationChannel } from "@prisma/client";
+import { sendSimulatedMessage } from "@/lib/adapters/sms";
 
 /**
  * Multi-channel service of notice (Module 5.8). In-Platform, email,
@@ -25,7 +26,16 @@ export async function dispatchNotification(params: {
   const now = new Date();
   const created = [];
 
+  const recipientParty = params.recipientPartyId
+    ? await prisma.party.findUnique({ where: { id: params.recipientPartyId } })
+    : null;
+
   for (const channel of params.channels) {
+    if ((channel === "sms" || channel === "whatsapp") && recipientParty?.phone) {
+      await sendSimulatedMessage(recipientParty.phone, `${params.subject}: ${params.body}`);
+    }
+
+
     const isElectronicInstant = ["in_platform", "email", "whatsapp", "sms"].includes(channel);
     const deemedServiceDate = isElectronicInstant
       ? now

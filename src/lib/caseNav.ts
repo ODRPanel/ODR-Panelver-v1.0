@@ -20,5 +20,7 @@ export const CASE_NAV_ITEMS: CaseNavItem[] = [
   { label: "Counsel-Client", href: "/counsel-client" },
   { label: "Redfern Schedule", href: "/redfern" },
   { label: "FIDIC", href: "/fidic" },
+  { label: "Native Canvas", href: "/canvas" },
+  { label: "AI Layer", href: "/ai" },
   { label: "Case Summary", href: "/summary" },
 ];
