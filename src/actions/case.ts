@@ -298,20 +298,43 @@ export async function nominateArbitratorAction(formData: FormData) {
 
   const isPresiding = tribunal.compositionType === "sole" ? true : parsed.data.isPresiding ?? false;
 
-  await prisma.tribunalMember.create({
-    data: {
-      tribunalId: tribunal.id,
-      arbitratorUserId: parsed.data.arbitratorUserId,
-      nominationSource: parsed.data.nominationSource,
-      nominatedByPartyId: parsed.data.nominatedByPartyId || null,
-      isPresiding,
-    },
-  });
+  await prisma.$transaction(async (tx) => {
+    await tx.tribunalMember.create({
+      data: {
+        tribunalId: tribunal.id,
+        arbitratorUserId: parsed.data.arbitratorUserId,
+        nominationSource: parsed.data.nominationSource,
+        nominatedByPartyId: parsed.data.nominatedByPartyId || null,
+        isPresiding,
+      },
+    });
 
-  const newCount = tribunal.members.length + 1;
-  if (newCount >= requiredCount) {
-    await prisma.tribunal.update({ where: { id: tribunal.id }, data: { status: "constituted" } });
-  }
+    // A nominated Arbitrator needs Reference-level access from the moment
+    // of nomination (to review disclosure prompts, the case file, etc.),
+    // not only once formally confirmed by the Appointing Authority.
+    const arbitratorUser = await tx.user.findUnique({
+      where: { id: parsed.data.arbitratorUserId },
+      include: { role: true },
+    });
+    if (arbitratorUser) {
+      await tx.referenceRoleAssignment.upsert({
+        where: {
+          referenceId_userId_roleId: {
+            referenceId: parsed.data.referenceId,
+            userId: arbitratorUser.id,
+            roleId: arbitratorUser.roleId,
+          },
+        },
+        update: {},
+        create: { referenceId: parsed.data.referenceId, userId: arbitratorUser.id, roleId: arbitratorUser.roleId },
+      });
+    }
+
+    const newCount = tribunal.members.length + 1;
+    if (newCount >= requiredCount) {
+      await tx.tribunal.update({ where: { id: tribunal.id }, data: { status: "constituted" } });
+    }
+  });
 
   await writeAudit({
     action: "tribunal.member_nominated",
